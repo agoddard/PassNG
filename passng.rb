@@ -77,13 +77,31 @@ get '/generate/:token1/:token2' do
   if dbtoken
     redirect('/')
   else
+    image_url = "/render/#{token1}/#{token2}"
+    user_url = "/#{token1}/#{token2}"
+    erb :generate, :locals => { :image_url => image_url, :user_url => user_url}
+  end
+end
+
+get '/render/:token1/:token2' do
+  content_type 'image/png'
+  token1 = params['token1']
+  token2 = params['token2']
+  #make sure this token combination hasn't been used
+  dbtoken = Pass.first(:token1 => token1, :token2 => token2)
+  if dbtoken
+    redirect('/')
+  else
     p = Pass.new
     p.token1 = token1
     p.token2 = token2
     p.data = generate(8)
     p.created_at = Time.now
     p.save
-    data = Pass.first(:token1 => token1, :token2 => token2)
-    "Copy <a href=\"#{url("/#{token1}/#{token2}")}\">this URL</a>"
   end
+  lookup = Pass.first(:token1 => token1, :token2 => token2)
+  render_pass lookup[:data]
+  
 end
+  
+  
