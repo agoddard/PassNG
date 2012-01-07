@@ -1,10 +1,20 @@
 require 'RMagick'
 require 'sinatra'
-require 'digest'
-require 'encryptor'
-require 'base64'
+require 'data_mapper'
 include Magick
 
+DataMapper::setup(:default, "sqlite::memory:")
+
+class Pass
+  include DataMapper::Resource
+  property :id, Serial
+  property :token1, Text, :required => true
+  property :token2, Text, :required => true  
+  property :data, Text, :required => true
+  property :created_at, DateTime
+end
+
+DataMapper.finalize.auto_upgrade!
 
 def render_pass(pass)
   width = pass.length*50
@@ -33,30 +43,47 @@ def generate(size)
     return pass + sym[rand(sym.size-1)]
 end
 
-
-
 get '/' do
-  path = "/generate/#{rand(36**40).to_s(36)}"
+  path = "/generate/#{rand(36**6).to_s(36)}/#{rand(36**10).to_s(36)}"
   redirect to(path)
 end
 
-get '/send/:key' do
-  # save encrypted key in DB, return token for URL
-  token = params['key']
+get '/:token1/:token2' do
+  content_type 'image/png'
+  lookup = Pass.first(:token1 => params['token1'], :token2 => params['token2'])
+  if !lookup
+    redirect to '/missing'
+  else
+    data = lookup[:data]
+    lookup.destroy
+    render_pass data
+  end
 end
 
-# base64 for PoC
-get '/:token' do
-  content_type 'image/png'
-  # lookup token in DB, retun matching encrypted key
-  #decrypt key
-  #render password as graphic
-  render_pass Base64.decode64(params['token'])
+get '/missing' do
+  403
 end
 
-# random passwords
-get '/generate/:token' do
-  content_type 'image/png'
-  @type = params['type']
-  render_pass(generate(8))
+error 403 do
+  "The URL you entered has doesn't exist or has already been accessed"
+end
+  
+
+get '/generate/:token1/:token2' do
+  token1 = params['token1']
+  token2 = params['token2']
+  #make sure this token combination hasn't been used
+  dbtoken = Pass.first(:token1 => token1, :token2 => token2)
+  if dbtoken
+    redirect('/')
+  else
+    p = Pass.new
+    p.token1 = token1
+    p.token2 = token2
+    p.data = generate(8)
+    p.created_at = Time.now
+    p.save
+    data = Pass.first(:token1 => token1, :token2 => token2)
+    "Copy <a href=\"#{url("/#{token1}/#{token2}")}\">this URL</a>"
+  end
 end
