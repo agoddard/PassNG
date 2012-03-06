@@ -65,7 +65,7 @@ get '/missing' do
 end
 
 error 403 do
-  "The URL you entered has doesn't exist or has already been accessed"
+  "The URL you entered has doesn't exist"
 end
   
 
